@@ -13,13 +13,15 @@ import ctypes
 # CONSTANTES
 THRESHOLD = 0.75  # Umbral para la detección de picos (porcentaje respecto al máximo global)
 DISCARTED_SAMPLES = 1000 # Número de muestras a descartar entre cada nota
+SILENCE_TH = 1000000000 # Energía mínima de una corchea para considerar que no es silencio
 
 # VARIABLES
 audio_samples = []  # Muestras de audio
 max_audio_value = 0  # Máximo valor de la señal de audio
+fs = 0 # Frecuencia de muestreo
 
 # FUNCIONES
-def getSamples(file_name, channels=1):
+def getSamples(file_name):
     """
     getSamples obtiene las muestras de audio de un archivo .wav
 
@@ -31,7 +33,7 @@ def getSamples(file_name, channels=1):
         Número de canales a leer. 1 = Mono, 2 = Stereo.
     """
 
-    global max_audio_value
+    global fs
 
     # Se abre el archivo de audio
     audio = wave.open(file_name, "r")
@@ -41,7 +43,7 @@ def getSamples(file_name, channels=1):
     frames = audio.readframes(-1)
     signal = np.frombuffer(frames, dtype="int16")
 
-    if channels == 2:
+    if audio.getnchannels() == 2:
         # Leemos las posiciones pares de signal (solo el canal 1)
         signal = signal[::2]
 
@@ -51,9 +53,6 @@ def getSamples(file_name, channels=1):
 
     # Cerramos el archivo de audio
     audio.close()
-
-    # Almacenamos el máximo valor de la señal
-    max_audio_value = max(signal)
     
     return [time, signal]
 
@@ -61,7 +60,7 @@ def loadFileButtonFunction():
     global audio_samples
 
     print(fileNameBox.get())
-    audio_samples = getSamples(fileNameBox.get(), int(nChannelsBox.get()))
+    audio_samples = getSamples(fileNameBox.get())
 
     # Se actualiza el texto de la etiqueta de estado
     statusLabel.config(text="Archivo " + fileNameBox.get() + " cargado correctamente.")
@@ -86,6 +85,9 @@ def identify_freq(magnitude_fft,Ts,threshold):
     # Se crea el eje de frecuencias
     freq = np.linspace(0,1/(Ts*2),len(magnitude_fft))
     
+    # Se identifica el máximo global
+    max_value = np.max(magnitude_fft)
+
     # Lista para almacenar los máximos locales que superen el umbral
     max_frecs = []
     
@@ -97,31 +99,28 @@ def identify_freq(magnitude_fft,Ts,threshold):
            and magnitude_fft[sampleIndex] > magnitude_fft[sampleIndex+1]:
             
             # Se comprueba si el máximo supera el umbral
-            if magnitude_fft[sampleIndex] > max_audio_value*threshold:
+            if magnitude_fft[sampleIndex] > max_value*threshold:
                 max_frecs.append(freq[sampleIndex])
     
-    if len(max_frecs) == 0:
-        return 0 # Si no se ha detectado ningún máximo, es porque hay silencio en esa corchea
-    else:
-        return min(max_frecs)
+    return min(max_frecs)
 
 def freq_to_note(freq):
-    if freq == 0:
-        return "SILENCIO"
-    else:
-        notes = ['A', 'A#', 'B', 'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#']
+    notes = ['A', 'A#', 'B', 'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#']
 
-        note_index = 12*np.log2(freq/440)+49  
-        note_index = round(note_index)
+    note_index = 12*np.log2(freq/440)+49
+    note_index = round(note_index)
+    if (TranspositionBox.get() == "Bb"):
+        note_index += 2
+    
+    note = (note_index - 1) % len(notes)
         
-        note = (note_index - 1) % len(notes)
-        note = notes[int(note)]
-        
-        # Como a la octava más baja se le asocian los índices de tecla -8, -7, ...
-        # se le suma 8 para calcular la octava.
-        octave = (note_index+8)//len(notes)
-        
-        return str(note)+str(int(octave))
+    note = notes[int(note)]
+    
+    # Como a la octava más baja se le asocian los índices de tecla -8, -7, ...
+    # se le suma 8 para calcular la octava.
+    octave = (note_index+8)//len(notes)
+    
+    return str(note)+str(int(octave))
 
 def showWaveForm():
     if audio_samples == []:
@@ -146,7 +145,6 @@ def musicToTxt():
     global audio_samples
 
     # Se debe encontrar el número de muestras correspondientes a la mínima figura rítmica (una corchea).
-    fs = int(fsBox.get()) # Hz
     bpm = int(bpmBox.get()) # Beats per minute
     muestras_corchea = (1/(2*bpm))*60*fs # Muestras/corchea
     
@@ -154,29 +152,33 @@ def musicToTxt():
     corcheas_time = []
 
     while len(audio_samples[1]) > muestras_corchea:
-        corcheas.append(audio_samples[1][:int(muestras_corchea)])
+        corcheas.append(audio_samples[1][:int(muestras_corchea)].astype(np.int64))
         corcheas_time.append(audio_samples[0][:int(muestras_corchea)])
         audio_samples[1] = audio_samples[1][int(muestras_corchea):]
         audio_samples[0] = audio_samples[0][int(muestras_corchea):]
         
     # Si aún quedan muestras en el audio, se añaden como un último elmento al final
     if len(audio_samples[1]):
-        corcheas.append(audio_samples[1])
+        corcheas.append(audio_samples[1].astype(np.int64))
         corcheas_time.append(audio_samples[0])
     
     notasIdentificadas = []
 
     for corchea in corcheas:
-        corchea_fft = np.fft.fft(corchea[DISCARTED_SAMPLES:])
-        magnitud_corchea_fft = np.abs(corchea_fft)
+        # Se lleva a cabo el cálculo de la energía de cada corchea, y vemos
+        # si supera el umbral del silencio
+        if np.sum(np.power(np.abs(corchea[DISCARTED_SAMPLES:]), 2)) > SILENCE_TH:
+            corchea_fft = np.fft.fft(corchea[DISCARTED_SAMPLES:])
+            magnitud_corchea_fft = np.abs(corchea_fft)
+        
+            
+            # Se obtiene el eje de frecuencias
+            Ts = 1/fs # Siendo la frecuencia de muestreo 44.1 kHz
+            magnitud_corchea_fft = magnitud_corchea_fft[:int(np.round(len(magnitud_corchea_fft)/2))]
+            corchea_freq = np.linspace(0,1/(Ts*2),len(magnitud_corchea_fft))
+        
+            notasIdentificadas.append(freq_to_note(identify_freq(magnitud_corchea_fft,Ts,THRESHOLD)))
 
-        # Se obtiene el eje de frecuencias
-        Ts = 1/fs # Siendo la frecuencia de muestreo 44.1 kHz
-        magnitud_corchea_fft = magnitud_corchea_fft[:int(np.round(len(magnitud_corchea_fft)/2))]
-        corchea_freq = np.linspace(0,1/(Ts*2),len(magnitud_corchea_fft))
-
-        notasIdentificadas.append(freq_to_note(identify_freq(magnitud_corchea_fft,Ts,THRESHOLD)))
-    
     # Se crea el archivo de texto
     file = open("notas.txt", "w")
     file.write("Notas identificadas:\n")
@@ -197,31 +199,27 @@ titulo.config(font=("Arial", 50))  # Increase the font size to 20
 titulo.pack(fill=tk.X) # Para posicionar la etiqueta en la ventana
 
 fileNameBox = tk.Entry(window, font=("Arial", 22))
-fileNameBox.place(x=30, y=150, width=410, height=50)
+fileNameBox.place(x=30, y=150, width=500, height=50)
 fileNameBox.insert(0, "audios/")  # Establecer el texto inicial
 
-nChannelsValues = ["1", "2"]
-nChannelsBox = tk.StringVar(window)
-nChannelsBox.set(nChannelsValues[0])
-nChannelsDropdown = tk.OptionMenu(window, nChannelsBox, *nChannelsValues)
-nChannelsDropdown.place(x=460, y=150, width=80, height=50)
-nChannelsDropdown.config(font=("Arial", 18))
-window.nametowidget(nChannelsDropdown.menuname).config(font=("Arial", 18))  # Set the dropdown menu's font
+transpositorLabel = tk.Label(window, text="Transposición:", font=("Arial", 18))
+transpositorLabel.place(x=300, y=220, width=200, height=50)
+TranspositionValues = ["C", "Bb"]
+TranspositionBox = tk.StringVar(window)
+TranspositionBox.set(TranspositionValues[0])
+TranspositionDropdown = tk.OptionMenu(window, TranspositionBox, *TranspositionValues)
+TranspositionDropdown.place(x=500, y=220, width=110, height=50)
+TranspositionDropdown.config(font=("Arial", 18))
+window.nametowidget(TranspositionDropdown.menuname).config(font=("Arial", 18))  # Set the dropdown menu's font
 
 loadFileButton = tk.Button(window, text="Cargar archivo", font=("Arial", 18), command = loadFileButtonFunction)
 loadFileButton.place(x=550, y=150, width=200, height=50)
 
 bpmLabel = tk.Label(window, text="BPM:", font=("Arial", 18))
-bpmLabel.place(x=130, y=220, width=200, height=50)
+bpmLabel.place(x=70, y=220, width=200, height=50)
 bpmBox = tk.Entry(window, font=("Arial", 18))
-bpmBox.place(x=280, y=220, width=75, height=50)
+bpmBox.place(x=220, y=220, width=75, height=50)
 bpmBox.insert(0, "60")  # Establecer el texto inicial
-
-fsLabel = tk.Label(window, text="fs:", font=("Arial", 18))
-fsLabel.place(x=380, y=220, width=50, height=50)
-fsBox = tk.Entry(window, font=("Arial", 18))
-fsBox.place(x=460, y=220, width=110, height=50)
-fsBox.insert(0, "44100")  # Establecer el texto inicial
 
 generateWaveForm = tk.Button(window, text="Mostrar forma de onda", font=("Arial", 18), command = showWaveForm)
 generateWaveForm.place(x=220, y=300, width=300, height=50)
