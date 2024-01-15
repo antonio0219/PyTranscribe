@@ -10,11 +10,6 @@ import wave
 import tkinter as tk
 import ctypes
 
-# CONSTANTES
-THRESHOLD = 0.75  # Umbral para la detección de picos (porcentaje respecto al máximo global)
-DISCARTED_SAMPLES = 1000 # Número de muestras a descartar entre cada nota
-SILENCE_TH = 1000000000 # Energía mínima de una corchea para considerar que no es silencio
-
 # VARIABLES
 audio_samples = []  # Muestras de audio
 max_audio_value = 0  # Máximo valor de la señal de audio
@@ -109,8 +104,10 @@ def freq_to_note(freq):
 
     note_index = 12*np.log2(freq/440)+49
     note_index = round(note_index)
-    if (TranspositionBox.get() == "Bb"):
+    if TranspositionBox.get() == "Bb":
         note_index += 2
+    elif TranspositionBox.get() == "Eb":
+        note_index -= 3
     
     note = (note_index - 1) % len(notes)
         
@@ -167,8 +164,8 @@ def musicToTxt():
     for corchea in corcheas:
         # Se lleva a cabo el cálculo de la energía de cada corchea, y vemos
         # si supera el umbral del silencio
-        if np.sum(np.power(np.abs(corchea[DISCARTED_SAMPLES:]), 2)) > SILENCE_TH:
-            corchea_fft = np.fft.fft(corchea[DISCARTED_SAMPLES:])
+        if np.sum(np.power(np.abs(corchea[DiscartedBox.get():]), 2)) > SilenceBox.get():
+            corchea_fft = np.fft.fft(corchea[DiscartedBox.get():])
             magnitud_corchea_fft = np.abs(corchea_fft)
         
             
@@ -177,7 +174,9 @@ def musicToTxt():
             magnitud_corchea_fft = magnitud_corchea_fft[:int(np.round(len(magnitud_corchea_fft)/2))]
             corchea_freq = np.linspace(0,1/(Ts*2),len(magnitud_corchea_fft))
         
-            notasIdentificadas.append(freq_to_note(identify_freq(magnitud_corchea_fft,Ts,THRESHOLD)))
+            notasIdentificadas.append(freq_to_note(identify_freq(magnitud_corchea_fft,Ts,THBox.get())))
+        else:
+            notasIdentificadas.append("Silencio")
 
     # Se crea el archivo de texto
     file = open("notas.txt", "w")
@@ -203,12 +202,12 @@ fileNameBox.place(x=30, y=150, width=500, height=50)
 fileNameBox.insert(0, "audios/")  # Establecer el texto inicial
 
 transpositorLabel = tk.Label(window, text="Transposición:", font=("Arial", 18))
-transpositorLabel.place(x=300, y=220, width=200, height=50)
-TranspositionValues = ["C", "Bb"]
+transpositorLabel.place(x=380, y=220, width=200, height=50)
+TranspositionValues = ["C", "Bb", "Eb"]
 TranspositionBox = tk.StringVar(window)
 TranspositionBox.set(TranspositionValues[0])
 TranspositionDropdown = tk.OptionMenu(window, TranspositionBox, *TranspositionValues)
-TranspositionDropdown.place(x=500, y=220, width=110, height=50)
+TranspositionDropdown.place(x=580, y=220, width=110, height=50)
 TranspositionDropdown.config(font=("Arial", 18))
 window.nametowidget(TranspositionDropdown.menuname).config(font=("Arial", 18))  # Set the dropdown menu's font
 
@@ -222,13 +221,31 @@ bpmBox.place(x=220, y=220, width=75, height=50)
 bpmBox.insert(0, "60")  # Establecer el texto inicial
 
 generateWaveForm = tk.Button(window, text="Mostrar forma de onda", font=("Arial", 18), command = showWaveForm)
-generateWaveForm.place(x=220, y=300, width=300, height=50)
+generateWaveForm.place(x=50, y=300, width=300, height=50)
+
+THLabel = tk.Label(window, text="Umbral detección:", font=("Arial", 18))
+THLabel.place(x=390, y=300, width=200, height=50)
+THBox = tk.Entry(window, font=("Arial", 18))
+THBox.place(x=650, y=300, width=75, height=50)
+THBox.insert(0, "0.75")  # Establecer el texto inicial
 
 musicToTxtButton = tk.Button(window, text="Exportar notas a txt", font=("Arial",18), command = musicToTxt)
-musicToTxtButton.place(x=220, y=390, width=300, height=50)
+musicToTxtButton.place(x=50, y=390, width=300, height=50)
+
+DiscartedLabel = tk.Label(window, text="Muestras descartadas:", font=("Arial", 18))
+DiscartedLabel.place(x=350, y=390, width=300, height=50)
+DiscartedBox = tk.Entry(window, font=("Arial", 18))
+DiscartedBox.place(x=645, y=390, width=90, height=50)
+DiscartedBox.insert(0, "1000")  # Establecer el texto inicial
 
 musicToPdfButton = tk.Button(window, text="Exportar a partitura", font=("Arial",18), command = musicToTxt)
-musicToPdfButton.place(x=220, y=480, width=300, height=50)
+musicToPdfButton.place(x=50, y=480, width=300, height=50)
+
+SilenceLabel = tk.Label(window, text="Umbral del silencio:", font=("Arial", 18))
+SilenceLabel.place(x=340, y=480, width=300, height=50)
+SilenceBox = tk.Entry(window, font=("Arial", 18))
+SilenceBox.place(x=610, y=480, width=150, height=50)
+SilenceBox.insert(0, "1000000000")  # Establecer el texto inicial
 
 statusLabel = tk.Label(window, text="Rellenar parámetros del archivo .wav", font=("Arial", 18))
 statusLabel.pack()
