@@ -137,7 +137,7 @@ def showWaveForm():
         # Se actualiza el texto de la etiqueta de estado
         statusLabel.config(text="Se han representado las muestras de audio correctamente.")
 
-def musicToTxt():
+def get_notes():
 
     global audio_samples
 
@@ -178,12 +178,25 @@ def musicToTxt():
         else:
             notasIdentificadas.append("Silencio")
 
+    return notasIdentificadas
+
+def musicToTxt():
+
+    notasIdentificadas = get_notes()    
+
     # Se crea el archivo de texto
     file = open("notas.txt", "w")
     file.write("Notas identificadas:\n")
     for nota in notasIdentificadas:
         file.write(nota + "\n")
     file.close()
+
+def musicToPdf():
+
+    notasIdentificadas = get_notes()
+
+    
+
 
 # Se inicia la interfaz de usuario
 window = tk.Tk() # Contenedor donde se añaden los elementos gráficos
@@ -238,7 +251,7 @@ DiscartedBox = tk.Entry(window, font=("Arial", 18))
 DiscartedBox.place(x=645, y=390, width=90, height=50)
 DiscartedBox.insert(0, "1000")  # Establecer el texto inicial
 
-musicToPdfButton = tk.Button(window, text="Exportar a partitura", font=("Arial",18), command = musicToTxt)
+musicToPdfButton = tk.Button(window, text="Exportar a partitura", font=("Arial",18), command = musicToPdf)
 musicToPdfButton.place(x=50, y=480, width=300, height=50)
 
 SilenceLabel = tk.Label(window, text="Umbral del silencio:", font=("Arial", 18))
