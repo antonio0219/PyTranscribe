@@ -164,8 +164,8 @@ def musicToTxt():
     for corchea in corcheas:
         # Se lleva a cabo el cálculo de la energía de cada corchea, y vemos
         # si supera el umbral del silencio
-        if np.sum(np.power(np.abs(corchea[DiscartedBox.getint():]), 2)) > SilenceBox.getint():
-            corchea_fft = np.fft.fft(corchea[DiscartedBox.getint():])
+        if np.sum(np.power(np.abs(corchea[int(DiscartedBox.get()):]), 2)) > int(SilenceBox.get()):
+            corchea_fft = np.fft.fft(corchea[int(DiscartedBox.get()):])
             magnitud_corchea_fft = np.abs(corchea_fft)
         
             
@@ -174,7 +174,7 @@ def musicToTxt():
             magnitud_corchea_fft = magnitud_corchea_fft[:int(np.round(len(magnitud_corchea_fft)/2))]
             corchea_freq = np.linspace(0,1/(Ts*2),len(magnitud_corchea_fft))
         
-            notasIdentificadas.append(freq_to_note(identify_freq(magnitud_corchea_fft,Ts,THBox.getint())))
+            notasIdentificadas.append(freq_to_note(identify_freq(magnitud_corchea_fft,Ts,float(THBox.get()))))
         else:
             notasIdentificadas.append("Silencio")
 
