@@ -8,6 +8,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import wave
 import tkinter as tk
+from tkinter import filedialog
 import ctypes
 import lilypond
 import subprocess
@@ -16,6 +17,7 @@ import subprocess
 audio_samples = []  # Muestras de audio
 max_audio_value = 0  # Máximo valor de la señal de audio
 fs = 0 # Frecuencia de muestreo
+fileDir = "" #Ruta al archivo
 
 # FUNCIONES
 def getSamples(file_name):
@@ -53,11 +55,23 @@ def getSamples(file_name):
     
     return [time, signal]
 
+def getFileDirection():
+    global fileDir
+    fileDir = filedialog.askopenfilename(title="Seleccionar archivo")
+
+    rutaSimple = fileDir.split("/")
+
+    nuevaRuta = "/".join(rutaSimple[-2:])
+
+    print(nuevaRuta)
+    fileNameBox.delete(0, tk.END)
+    fileNameBox.insert(0, nuevaRuta)  # Establecer el texto inicial
+
 def loadFileButtonFunction():
     global audio_samples
 
     print(fileNameBox.get())
-    audio_samples = getSamples(fileNameBox.get())
+    audio_samples = getSamples(fileDir)
 
     # Se actualiza el texto de la etiqueta de estado
     statusLabel.config(text="Archivo " + fileNameBox.get() + " cargado correctamente.")
@@ -227,7 +241,7 @@ def musicToPdf():
     # Se crea el archivo de texto
  
     file = open("partitura.ly.", "w")
-    file.write("\version \"2.24.3\"\n")
+    file.write("\\version \"2.24.3\"\n")
     file.write("{\n")
     file.write("\override Score.TimeSignature.transparent = ##t\n")
     file.write("\cadenzaOn\n")
@@ -257,6 +271,12 @@ fileNameBox = tk.Entry(window, font=("Arial", 22))
 fileNameBox.place(x=30, y=150, width=500, height=50)
 fileNameBox.insert(0, "audios/")  # Establecer el texto inicial
 
+loadFileButton = tk.Button(window, text="Cargar", font=("Arial", 18), command = loadFileButtonFunction)
+loadFileButton.place(x=550, y=150, width=100, height=50)
+
+boton_examinar = tk.Button(window, text="Buscar", font=("Arial", 18), command=getFileDirection)
+boton_examinar.place(x=655, y=150, width=100, height=50)
+
 transpositorLabel = tk.Label(window, text="Transposición:", font=("Arial", 18))
 transpositorLabel.place(x=380, y=220, width=200, height=50)
 TranspositionValues = ["C", "Bb", "Eb"]
@@ -266,9 +286,6 @@ TranspositionDropdown = tk.OptionMenu(window, TranspositionBox, *TranspositionVa
 TranspositionDropdown.place(x=580, y=220, width=110, height=50)
 TranspositionDropdown.config(font=("Arial", 18))
 window.nametowidget(TranspositionDropdown.menuname).config(font=("Arial", 18))  # Set the dropdown menu's font
-
-loadFileButton = tk.Button(window, text="Cargar archivo", font=("Arial", 18), command = loadFileButtonFunction)
-loadFileButton.place(x=550, y=150, width=200, height=50)
 
 bpmLabel = tk.Label(window, text="BPM:", font=("Arial", 18))
 bpmLabel.place(x=70, y=220, width=200, height=50)
