@@ -1,0 +1,17 @@
+El uso de ventanas reduce los efectos de fuga en frecuencia. 
+
+Antes de realizar la FFT a una señal "periódica", aplicamos una ventana en tiempo para poder realizar la transformada. Haciendo esto, estamos recortando la señal convirtiéndola en la mayoría de los casos, en "no periódica". 
+
+Realizar la transformada de fourier a una señal no periódica producirá el fenómeno de "fuga en frecuencia". Este fenómeno consiste en que en el espectro de la señal, apreciaremos que la potencia se distribuye a lo largo de un rango de frecuencias, cuando lo que esperamos es un pico en la frecuencia de la señal inicial periódica.
+
+Para evitar esto, se usan VENTANAS, las cuales anulan la señal al comienzo y al final de la ventana, de este modo, estamos obteniendo una señal "periódica" puesto que el valor de la señal será 0 al inicio y al final de la ventana.
+
+Las ventanas reducen los efectos de la fuga en frecuencia, pero no lo eliminan al completo, de hecho lo que hacen es modificar esa fuga.
+Además, las ventanas modifican ligeramente el espectro de la señal a la que le estamos realizando la transformada de Fourier, por lo que será necesario elegir en función de las necesidades la ventana más apropiada.
+
+Necesidades:
+- ¿Trabajamos con señales aleatorios o sinusoidales?
+- ¿Queremos detectar con buena precisión la frecuencia de la señal?
+- ¿Nos interesa conocer con precisión la amplitud de la señal. (Del pico en frecuencia)?
+
+Para el caso en el que estamos trabajando, a priori parece razonable usar una ventana que favorezca la resolución en frecuencia, ya que nos interesa detectar con precisión la nota que está sonando. Tras realizar simulaciones comprobaremos si la hipótesis es correcta :)s
