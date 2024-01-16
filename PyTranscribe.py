@@ -181,10 +181,13 @@ def get_notes():
         # Se lleva a cabo el cálculo de la energía de cada corchea, y vemos
         # si supera el umbral del silencio
         if np.sum(np.power(np.abs(corchea[int(DiscartedBox.get()):]), 2)) > int(SilenceBox.get()):
-            corchea_fft = np.fft.fft(corchea[int(DiscartedBox.get()):])
+            discards = int(DiscartedBox.get())
+            length_corchea = len(corchea)
+            ventana = windowSelector((length_corchea-discards))
+            #Realizamos la transformada sin contar las muestras descartadas
+            corchea_fft = np.fft.fft(corchea[discards:]*ventana) 
             magnitud_corchea_fft = np.abs(corchea_fft)
-        
-            
+         
             # Se obtiene el eje de frecuencias
             Ts = 1/fs # Siendo la frecuencia de muestreo 44.1 kHz
             magnitud_corchea_fft = magnitud_corchea_fft[:int(np.round(len(magnitud_corchea_fft)/2))]
@@ -195,6 +198,33 @@ def get_notes():
             notasIdentificadas.append("Silencio")
 
     return notasIdentificadas
+
+
+def windowSelector(longitud):
+    """
+    windowSelector Permite cambiar la ventana de la FFT.
+
+    Parameters
+    ----------
+    longitud : int
+        Valor entero que indica la longitud de la ventana
+    
+    Returns: devuelve un array de numpy correspondiente a la ventana elegida.
+    """ 
+    txtVentana = windowBox.get()
+    window = np.ones(longitud, dtype=np.int64) #Ventana rectangular
+
+    if(txtVentana == "Kaiser"):
+        #El parámetro beta de la Kaiser se queda como 14.
+        window = np.kaiser(longitud,14)
+
+    if(txtVentana == "Hanning"):
+        window = np.hanning(longitud)
+
+    if(txtVentana == "Bartlett"):
+        window = np.hanning(longitud)
+
+    return window
 
 def musicToTxt():
 
@@ -229,7 +259,6 @@ def musicToPdf():
     while i < len(notasFormatoPond):
         if i < len(notasFormatoPond) - 3 and notasFormatoPond[i] == notasFormatoPond[i+1] == notasFormatoPond[i+2] == notasFormatoPond[i+3]:
             resultado.append(notasFormatoPond[i] +"2")
-            resultado.append(2)
             i += 4
         elif i < len(notasFormatoPond) - 1 and notasFormatoPond[i] == notasFormatoPond[i+1]:
             resultado.append(notasFormatoPond[i] +"4")
@@ -277,21 +306,33 @@ loadFileButton.place(x=550, y=150, width=100, height=50)
 boton_examinar = tk.Button(window, text="Buscar", font=("Arial", 18), command=getFileDirection)
 boton_examinar.place(x=655, y=150, width=100, height=50)
 
+bpmLabel = tk.Label(window, text="BPM:", font=("Arial", 18))
+bpmLabel.place(x=50, y=220, width=70, height=50)
+bpmBox = tk.Entry(window, font=("Arial", 18))
+bpmBox.place(x=130, y=220, width=60, height=50)
+bpmBox.insert(0, "60")  # Establecer el texto inicial
+
 transpositorLabel = tk.Label(window, text="Transposición:", font=("Arial", 18))
-transpositorLabel.place(x=380, y=220, width=200, height=50)
+transpositorLabel.place(x=230, y=220, width=160, height=50)
+
 TranspositionValues = ["C", "Bb", "Eb"]
 TranspositionBox = tk.StringVar(window)
 TranspositionBox.set(TranspositionValues[0])
 TranspositionDropdown = tk.OptionMenu(window, TranspositionBox, *TranspositionValues)
-TranspositionDropdown.place(x=580, y=220, width=110, height=50)
+TranspositionDropdown.place(x=400, y=220, width=80, height=50)
 TranspositionDropdown.config(font=("Arial", 18))
 window.nametowidget(TranspositionDropdown.menuname).config(font=("Arial", 18))  # Set the dropdown menu's font
 
-bpmLabel = tk.Label(window, text="BPM:", font=("Arial", 18))
-bpmLabel.place(x=70, y=220, width=200, height=50)
-bpmBox = tk.Entry(window, font=("Arial", 18))
-bpmBox.place(x=220, y=220, width=75, height=50)
-bpmBox.insert(0, "60")  # Establecer el texto inicial
+windowLabel = tk.Label(window, text="Ventana:", font=("Arial", 18))
+windowLabel.place(x=490, y=220, width=120, height=50)
+
+windowValues = ["None","Kaiser", "Hanning", "Bartlett"]
+windowBox = tk.StringVar(window)
+windowBox.set(windowValues[0])
+windowDropdown = tk.OptionMenu(window, windowBox, *windowValues)
+windowDropdown.place(x=610, y=220, width=150, height=50)
+windowDropdown.config(font=("Arial", 18))
+window.nametowidget(windowDropdown.menuname).config(font=("Arial", 18))  # Set the dropdown menu's font
 
 generateWaveForm = tk.Button(window, text="Mostrar forma de onda", font=("Arial", 18), command = showWaveForm)
 generateWaveForm.place(x=50, y=300, width=300, height=50)
