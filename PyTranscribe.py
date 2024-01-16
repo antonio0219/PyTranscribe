@@ -9,6 +9,8 @@ import matplotlib.pyplot as plt
 import wave
 import tkinter as tk
 import ctypes
+import lilypond
+import subprocess
 
 # VARIABLES
 audio_samples = []  # Muestras de audio
@@ -194,9 +196,50 @@ def musicToTxt():
 def musicToPdf():
 
     notasIdentificadas = get_notes()
-
     
-
+    notasFormatoPond = []
+    
+    for nota in notasIdentificadas:
+        notaLily = ''
+        if len(nota) == 3:
+            notaLily = nota[0].lower() + "is" 
+        else:
+            notaLily = nota[0].lower()
+    
+        numcomillas = int(nota[-1]) -3
+        notaLily+= numcomillas*"'"
+        notasFormatoPond.append(notaLily)
+    
+    resultado = []
+    i = 0
+    while i < len(notasFormatoPond):
+        if i < len(notasFormatoPond) - 3 and notasFormatoPond[i] == notasFormatoPond[i+1] == notasFormatoPond[i+2] == notasFormatoPond[i+3]:
+            resultado.append(notasFormatoPond[i] +"2")
+            resultado.append(2)
+            i += 4
+        elif i < len(notasFormatoPond) - 1 and notasFormatoPond[i] == notasFormatoPond[i+1]:
+            resultado.append(notasFormatoPond[i] +"4")
+            i += 2
+        else:
+            resultado.append(notasFormatoPond[i] + "8")
+            i += 1
+    
+    # Se crea el archivo de texto
+ 
+    file = open("partitura.ly.", "w")
+    file.write("\version \"2.24.3\"\n")
+    file.write("{\n")
+    file.write("\override Score.TimeSignature.transparent = ##t\n")
+    file.write("\cadenzaOn\n")
+    while len(resultado) > 20:
+        file.write(" ".join(resultado[:20]) + "\\break" +"\n")
+        resultado = resultado[20:]
+    file.write(" ".join(resultado) + "\n")
+    file.write("\cadenzaOff\n")
+    file.write("}\n")
+    file.close()
+    
+    subprocess.run([lilypond.executable(),"partitura.ly"])
 
 # Se inicia la interfaz de usuario
 window = tk.Tk() # Contenedor donde se añaden los elementos gráficos
